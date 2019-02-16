@@ -8,7 +8,7 @@ Simple client for ElasticSearch. Helps to make simple search or aggregate querie
    
 $client = new \Selastic\Client('http://yourelasticnode.com');
 // Not requared, by default will be used '_all'
-$client->useIndex('analytics')
+$client->useIndex('analytics');
 
 // Simple string query
 $result = $client->search('user:12');
