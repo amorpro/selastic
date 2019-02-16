@@ -1,0 +1,15 @@
+{
+    "name": "amorpro/selastic",
+    "license": "MIT",
+    "type": "library",
+    "description": "Simple Elastic Search client",
+    "homepage": "https://github.com/amorpro/selastic",
+    "autoload": {
+        "psr-4": {
+            "Selastic\\": "src/"
+        }
+    },
+    "require-dev": {
+        "amorpro/tweetest": "dev-master"
+    }
+}
