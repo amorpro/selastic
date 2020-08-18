@@ -12,9 +12,7 @@ scenario(function($q, $exception){
 
 },[
     'empty query' => [ null, InvalidArgumentException::class ],
-    'empty array' => [ [], InvalidArgumentException::class ],
-    'empty json' => [ '{}', InvalidArgumentException::class ],
-    'wrongly formatted json' => [ '{"aa":1,}', InvalidArgumentException::class ]
+    'empty array' => [ [], InvalidArgumentException::class ]
 ] );
 
 scenario(function($q){
@@ -29,5 +27,4 @@ scenario(function($q){
 },[
     'string query' => [ 'user:11'],
     'array query' => [ ['user' => 11] ],
-    'json query' => [ '{"user":11}'],
 ] );

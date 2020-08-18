@@ -29,6 +29,16 @@ class Client
     private $index = self::INDEX_ALL;
 
     /**
+     * @var int
+     */
+    private $from = 0;
+
+    /**
+     * @var int
+     */
+    private $size = 10;
+
+    /**
      * @var Curl
      */
     private $curl;
@@ -60,6 +70,31 @@ class Client
         return $this;
     }
 
+    /**
+     * Starting document offset. Default 0
+     *
+     * @param int $from
+     * @return $this
+     */
+    public function setFrom($from)
+    {
+        $this->from = (int)$from;
+        return $this;
+    }
+
+    /**
+     * Number of document to return. Default 10
+     *
+     * @param int $size
+     * @return $this
+     */
+    public function setSize($size)
+    {
+        $this->size = (int)$size;
+        return $this;
+    }
+
+
 
     /**
      * Do the search request to Elastic Search.
@@ -70,20 +105,30 @@ class Client
      *
      * $client->search('hours:>2 AND user:"Anton Butkov"')
      *
-     * Aggregation search request via json
-     *
-     * $client->search('{
-     *   'query' : {...},
-     *   'aggs' : {...}
-     * }');
-     *
-     *
      * Aggregation search request via array
      *
      * $client->search([
      *   'query' => [...],
      *   'aggs' => [...]
      * ]);
+     *
+     * result example
+     * [
+            'took' => 115,
+            'timed_out' => false,
+            '_shards' => [
+                'total' => 693,
+                'successful' => 693,
+                'failed' => 0
+            ],
+            'hits' => [
+                'total' => 63152,
+                'max_score' => 10.24,
+                'hits' => [
+                    // array of result documents
+                ]
+            ]
+       ]
      *
      * @param string|array|json $q
      * @return array
@@ -100,20 +145,15 @@ class Client
                 throw new \InvalidArgumentException('Query can\'b be an empty array');
             }
 
+            if(!isset($q['query'])){
+                $q['query'] = $q;
+            }
+            $q['from'] = $this->from;
+            $q['size'] = $this->size;
+
             $q = json_encode($q);
             if(!$q){
                 throw new \InvalidArgumentException('Query array has wrong format to be json_encoded');
-            }
-        }
-
-        if($this->_isJson($q)){
-            $decodedQuery = json_decode($q);
-            if(!$decodedQuery){
-                throw new \InvalidArgumentException('Json query has wrong format and can\'t be decoded');
-            }
-
-            if(!count((array)$decodedQuery)){
-                throw new \InvalidArgumentException('Json query has can\'t be with empty body');
             }
 
             return $this->_searchDo($this->_buildSearchUrl(), $q);
@@ -152,7 +192,7 @@ class Client
     protected function _buildSearchUrl($q = null)
     {
         return $q ?
-            sprintf('%s/%s/_search?q=%s', $this->apiUrl, urlencode($this->index), urlencode($q)) :
+            sprintf('%s/%s/_search?from=%s&size=%s&q=%s', $this->apiUrl, urlencode($this->index), $this->from, $this->size, urlencode($q)) :
             sprintf('%s/%s/_search', $this->apiUrl, urlencode($this->index));
     }
 
