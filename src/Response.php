@@ -118,7 +118,8 @@ int(0)
     public function getDocuments()
     {
         $documents = [];
-        foreach($this->raw['hits']['hits'] as $hit){
+        $hits = $this->raw['hits']['hits'] ?? [];
+        foreach($hits as $hit){
             $document = $hit['_source'];
             $document['_id'] = $hit['_id'];
 
