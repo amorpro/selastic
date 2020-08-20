@@ -31,12 +31,27 @@ class Client
     /**
      * @var int
      */
-    private $from = 0;
+    private $offset = 0;
 
     /**
      * @var int
      */
-    private $size = 10;
+    private $limit = 10;
+
+    /**
+     * @var \DateTime
+     */
+    private $timeStampFrom;
+
+    /**
+     * @var \DateTime
+     */
+    private $timestampTo;
+
+    /**
+     * @var []
+     */
+    private $columns;
 
     /**
      * @var Curl
@@ -52,17 +67,24 @@ class Client
     {
         $this->_assertApiReachable($apiUrl);
         $this->apiUrl = $apiUrl;
-        $this->useIndex($index);
+        $this->from($index);
         $this->curl = new Curl();
+    }
+
+    private function _assertApiReachable($apiUrl)
+    {
+        if (!filter_var($apiUrl, FILTER_VALIDATE_URL)) {
+            throw new \InvalidArgumentException('Invalid API url');
+        }
     }
 
     /**
      * @param $index
      * @return $this
      */
-    public function useIndex($index)
+    public function from($index)
     {
-        if(!$index){
+        if (!$index) {
             throw new \InvalidArgumentException('Index can\'t be empty');
         }
 
@@ -71,14 +93,48 @@ class Client
     }
 
     /**
+     * @return mixed
+     * @throws RequestFailed
+     */
+    public function getIndexes()
+    {
+        // https://www.elastic.co/guide/en/elasticsearch/reference/current/common-options.html
+        return $this->_searchDo(sprintf('%s/_cat/indices/%s?format=json&s=index', $this->apiUrl, $this->index));
+
+    }
+
+    /**
+     * @param $url
+     * @param null $q
+     * @return mixed
+     * @throws RequestFailed
+     */
+    private function _searchDo($url)
+    {
+        $curlOptions                         = [];
+        $curlOptions[CURLOPT_URL]            = $url;
+        $curlOptions[CURLOPT_RETURNTRANSFER] = true;
+
+        // REQUEST
+        $response = $this->curl->execute($curlOptions);
+        $result   = json_decode($response, true);
+
+        if (isset($result['error'])) {
+            throw new \RuntimeException($result['error']['reason']);
+        }
+        return new Response($result);
+
+    }
+
+    /**
      * Starting document offset. Default 0
      *
      * @param int $from
      * @return $this
      */
-    public function setFrom($from)
+    public function offset($from)
     {
-        $this->from = (int)$from;
+        $this->offset = (int)$from;
         return $this;
     }
 
@@ -88,101 +144,111 @@ class Client
      * @param int $size
      * @return $this
      */
-    public function setSize($size)
+    public function limit($size)
     {
-        $this->size = (int)$size;
+        $this->limit = (int)$size;
         return $this;
     }
 
+    /**
+     * @param $timestamp
+     * @return $this
+     * @throws \Exception
+     */
+    public function filterByCreatedFrom($timestamp)
+    {
+        $dateTime = new \DateTime('now');
+        $dateTime->setTimestamp($timestamp);
+        $dateTime->setTimezone(new \DateTimeZone('UTC'));
 
+        $this->timeStampFrom = $dateTime;
+
+        return $this;
+    }
+
+    /**
+     * @param $timestamp
+     * @return $this
+     * @throws \Exception
+     */
+    public function filterByCreatedTo($timestamp)
+    {
+        $dateTime = new \DateTime('now');
+        $dateTime->setTimestamp($timestamp);
+        $dateTime->setTimezone(new \DateTimeZone('UTC'));
+
+        $this->timestampTo = $dateTime;
+        return $this;
+    }
+
+    /**
+     * @param array $columns
+     * @return $this
+     */
+    public function select(array $columns)
+    {
+        if (!in_array('_id', $columns, true)) {
+            $columns[] = '_id';
+        }
+
+        $columns = array_map(function ($column) {
+            return $column === '_id' ?
+                'hits.hits.' . $column :
+                'hits.hits._source.' . $column;
+        }, $columns);
+
+        $columns[] = 'hits.total';
+        $columns[] = 'took';
+        $columns[] = 'timed_out';
+        $columns[] = '_shards';
+
+        $this->columns = $columns;
+
+        return $this;
+    }
 
     /**
      * Do the search request to Elastic Search.
      *
+     * @param string|array|json $q
+     * @return Response
+     * @throws RequestFailed
      * @example
      *
      * Base search request
      *
      * $client->search('hours:>2 AND user:"Anton Butkov"')
      *
-     * Aggregation search request via array
-     *
-     * $client->search([
-     *   'query' => [...],
-     *   'aggs' => [...]
-     * ]);
-     *
      * result example
      * [
-            'took' => 115,
-            'timed_out' => false,
-            '_shards' => [
-                'total' => 693,
-                'successful' => 693,
-                'failed' => 0
-            ],
-            'hits' => [
-                'total' => 63152,
-                'max_score' => 10.24,
-                'hits' => [
-                    // array of result documents
-                ]
-            ]
-       ]
+     * 'took' => 115,
+     * 'timed_out' => false,
+     * '_shards' => [
+     * 'total' => 693,
+     * 'successful' => 693,
+     * 'failed' => 0
+     * ],
+     * 'hits' => [
+     * 'total' => 63152,
+     * 'max_score' => 10.24,
+     * 'hits' => [
+     * // array of result documents
+     * ]
+     * ]
+     * ]
      *
-     * @param string|array|json $q
-     * @return array
-     * @throws RequestFailed
      */
     public function search($q)
     {
-        if(!$q){
+        if (!$q) {
             throw new \InvalidArgumentException('Query string can\'t be empty');
         }
 
-        if (is_array($q)) {
-            if(!count($q)){
-                throw new \InvalidArgumentException('Query can\'b be an empty array');
-            }
-
-            if(!isset($q['query'])){
-                $q['query'] = $q;
-            }
-            $q['from'] = $this->from;
-            $q['size'] = $this->size;
-
-            $q = json_encode($q);
-            if(!$q){
-                throw new \InvalidArgumentException('Query array has wrong format to be json_encoded');
-            }
-
-            return $this->_searchDo($this->_buildSearchUrl(), $q);
+        if($this->timeStampFrom && $this->timestampTo){
+            $q .= sprintf(' AND @timestamp:[%s TO %s]', $this->timeStampFrom->format('Y-m-d\TH:i:s'), $this->timestampTo->format('Y-m-d\TH:i:s'));
         }
 
         return $this->_searchDo($this->_buildSearchUrl($q));
-    }
-
-    /**
-     * @param $url
-     * @param null $q
-     * @return mixed
-     * @throws RequestFailed
-     */
-    private function _searchDo($url, $q = null)
-    {
-        $curlOptions = [];
-        $curlOptions[CURLOPT_URL]            = $url;
-        $curlOptions[CURLOPT_RETURNTRANSFER] = true;
-        if ($q) {
-            $curlOptions[CURLOPT_CUSTOMREQUEST] = 'POST';
-            $curlOptions[CURLOPT_POSTFIELDS]    = $q;
-            $curlOptions[CURLOPT_HTTPHEADER]    = $this->_getAdditionalElasticHeaders($url);
-        }
-
-        // REQUEST
-        $response = $this->curl->execute($curlOptions);
-        return json_decode($response, true);
-
     }
 
     /**
@@ -191,42 +257,19 @@ class Client
      */
     protected function _buildSearchUrl($q = null)
     {
-        return $q ?
-            sprintf('%s/%s/_search?from=%s&size=%s&q=%s', $this->apiUrl, urlencode($this->index), $this->from, $this->size, urlencode($q)) :
-            sprintf('%s/%s/_search', $this->apiUrl, urlencode($this->index));
+        return sprintf('%s/%s/_search?format=json&filter_path=%s&from=%s&size=%s&q=%s', $this->apiUrl, urlencode($this->index), $this->_getColumns(), $this->offset, $this->limit, urlencode($q));
     }
 
     /**
-     * @param $url
-     * @return array
-     * @throws RequestFailed
+     * @return string
      */
-    private function _getAdditionalElasticHeaders($url)
+    protected function _getColumns(): string
     {
-        $elasticHeaders = $this->curl->options($url);
-        $additionalHeaders = array_diff_key($elasticHeaders, array_fill_keys(Curl::HEADER_NAMES, null));
-
-        $additionalHeaderStrings = [];
-        foreach ($additionalHeaders as $header => $value) {
-            $additionalHeaderStrings[] = "$header: $value";
+        if (!$this->columns) {
+            return '*';
         }
-        return $additionalHeaderStrings;
-    }
 
-    /**
-     * @param $q
-     * @return false|int
-     */
-    private function _isJson($q)
-    {
-        return preg_match('/\{.*\}/', $q);
-    }
-
-    private function _assertApiReachable($apiUrl)
-    {
-        if(!filter_var($apiUrl, FILTER_VALIDATE_URL)){
-            throw new \InvalidArgumentException('Invalid API url');
-        }
+        return implode(',', $this->columns);
     }
 
 }
