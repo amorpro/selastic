@@ -121,7 +121,7 @@ int(0)
         $hits = $this->raw['hits']['hits'] ?? [];
         foreach($hits as $hit){
             $document = $hit['_source'];
-            $document['_id'] = $hit['_id'];
+            $document[Document::ID] = $hit[Document::ID];
 
             $documents[] = new Document($document);
         }

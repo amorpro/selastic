@@ -187,12 +187,14 @@ class Client
      */
     public function select(array $columns)
     {
-        if (!in_array('_id', $columns, true)) {
-            $columns[] = '_id';
+        if (!in_array(Document::ID, $columns, true)) {
+            $columns[] = Document::ID;
         }
 
+        $columns[] = Document::CREATED;
+
         $columns = array_map(function ($column) {
-            return $column === '_id' ?
+            return $column === Document::ID ?
                 'hits.hits.' . $column :
                 'hits.hits._source.' . $column;
         }, $columns);

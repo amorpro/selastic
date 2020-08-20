@@ -11,6 +11,9 @@ namespace Selastic;
 
 class Document
 {
+    const CREATED = '@timestamp';
+    const ID = '_id';
+
     private $hit = [];
 
     /**
@@ -28,7 +31,7 @@ class Document
      */
     public function getId()
     {
-        return $this->hit['_id'];
+        return $this->hit[self::ID];
     }
 
     /**
@@ -56,4 +59,14 @@ class Document
         throw new \InvalidArgumentException('Method does not exists');
     }
 
+    /**
+     * @return \DateTime
+     * @throws \Exception
+     */
+    public function getCreated()
+    {
+        $created = new \DateTime($this->get(self::CREATED));
+        $created->setTimezone(new \DateTimeZone('Europe/Prague'));
+        return $created;
+    }
 }
