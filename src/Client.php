@@ -36,7 +36,7 @@ class Client
     /**
      * @var int
      */
-    private $limit = 10;
+    private $limit = 10000;
 
     /**
      * @var \DateTime
