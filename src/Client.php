@@ -94,7 +94,7 @@ class Client
 
     /**
      * @return mixed
-     * @throws RequestFailed
+     * @throws array
      */
     public function getIndexes()
     {
@@ -122,7 +122,7 @@ class Client
         if (isset($result['error'])) {
             throw new \RuntimeException($result['error']['reason']);
         }
-        return new Response($result);
+        return $result;
 
     }
 
@@ -250,7 +250,7 @@ class Client
             $q .= sprintf(' AND @timestamp:[%s TO %s]', $this->timeStampFrom->format('Y-m-d\TH:i:s'), $this->timestampTo->format('Y-m-d\TH:i:s'));
         }
 
-        return $this->_searchDo($this->_buildSearchUrl($q));
+        return new Response($this->_searchDo($this->_buildSearchUrl($q)));
     }
 
     /**
