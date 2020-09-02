@@ -84,6 +84,9 @@ class Client
      */
     public function from($index)
     {
+        if(is_array($index)){
+            $index = implode($index, ',');
+        }
         if (!$index) {
             throw new \InvalidArgumentException('Index can\'t be empty');
         }
